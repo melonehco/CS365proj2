@@ -65,7 +65,37 @@ vector<Mat> readInImageDir( const char *dirname )
     return images;
 }
 
-int main(int argc, char *argv[]) {
+/* returns the sum-squared-distance of a 5x5 block of pixels
+ * in the centers of the two given images
+ */
+float distanceSSD( Mat &img1, Mat &img2 )
+{
+    //coordinates of 5x5 block corners
+    int img1startX = img1.width / 2 - 2;
+    int img1startY = img1.height / 2 - 2;
+    int img2startX = img2.width / 2 - 2;
+    int img2startY = img2.height / 2 - 2;
+
+    float sum = 0;
+    float blueDiff, greenDiff, redDiff;
+    for ( int i = 0; i < 5; i++ )
+    {
+        for ( int j = 0; j < 5; j++ )
+        {
+            Vec3b color1 = img1.at<Vec3b>( img1startX + i, img1startY + j );
+            Vec3b color2 = img2.at<Vec3b>( img2startX + i, img2startY + j ); 
+
+            blueDiff = color1[0] - color2[0];
+            greenDiff = color1[1] - color2[1];
+            redDiff = color1[2] - color2[2]; 
+            sum += (blueDiff * blueDiff) + (greenDiff * greenDiff) + (redDiff * redDiff);           
+        }
+    }
+
+    return sum;
+}
+
+int main( int argc, char *argv[] ) {
     char dirname[256];
 
 	// by default, look at the current directory
