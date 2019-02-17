@@ -13,7 +13,7 @@ CXX = $(CC)
 #CFLAGS = -I/usr/local/include -I../include
 
 # Dwarf include paths
-CFLAGS = -I../include /usr/include # opencv includes are in /usr/include
+CFLAGS = -I../include # opencv includes are in /usr/include
 CXXFLAGS = $(CFLAGS)
 
 # OSX Library paths (if you use MacPorts)
@@ -32,12 +32,6 @@ LDLIBS = -lopencv_core -lopencv_highgui -lopencv_video -lopencv_videoio -lopencv
 
 BINDIR = ../bin
 
-vid: vidDisplay.o
-	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
-
-imod: imgMod.o
-	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
-
 task1: task1.o
 	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
 
@@ -50,7 +44,7 @@ task3: task3.o
 task4: task4.o
 	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
 
-ext2: extension2.o
+task5: task5.o
 	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
 
 clean:
