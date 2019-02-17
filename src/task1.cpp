@@ -95,6 +95,19 @@ float distanceSSD( Mat &img1, Mat &img2 )
     return sum;
 }
 
+/* returns a copy of the input image database, sorted by the smallest values
+ * for the given distance metric calculated from the given query image
+ */
+vector<Mat> sortImageDB( Mat &queryImg, vector<Mat> &db, int distanceMetric )
+{
+    /*TODO: pass in function for distance metric*/
+
+    //calculate distance metric for each db image
+    vector<float> distances;
+    
+
+}
+
 int main( int argc, char *argv[] ) {
     char dirname[256];
 
