@@ -16,6 +16,7 @@
 #include <dirent.h>
 #include <cstring>
 #include <vector>
+#include <algorithm>
 #include "opencv2/opencv.hpp"
 
 using namespace std;
@@ -71,10 +72,10 @@ vector<Mat> readInImageDir( const char *dirname )
 float distanceSSD( Mat &img1, Mat &img2 )
 {
     //coordinates of 5x5 block corners
-    int img1startX = img1.width / 2 - 2;
-    int img1startY = img1.height / 2 - 2;
-    int img2startX = img2.width / 2 - 2;
-    int img2startY = img2.height / 2 - 2;
+    int img1startX = img1.cols / 2 - 2;
+    int img1startY = img1.rows / 2 - 2;
+    int img2startX = img2.cols / 2 - 2;
+    int img2startY = img2.rows / 2 - 2;
 
     float sum = 0;
     float blueDiff, greenDiff, redDiff;
@@ -95,6 +96,15 @@ float distanceSSD( Mat &img1, Mat &img2 )
     return sum;
 }
 
+/**
+ * Returns true if the second value in the first pair is less than 
+ * the second value in the second pair. Used to sort distances for sortImageDB.
+ */
+bool sortBySecondVal(const pair<Mat, float> &pair1, const pair<Mat, float> &pair2)
+{
+	return (pair1.second < pair2.second);
+}
+
 /* returns a copy of the input image database, sorted by the smallest values
  * for the given distance metric calculated from the given query image
  */
@@ -103,23 +113,60 @@ vector<Mat> sortImageDB( Mat &queryImg, vector<Mat> &db, int distanceMetric )
     /*TODO: pass in function for distance metric*/
 
     //calculate distance metric for each db image
-    vector<float> distances;
-    
 
+	vector<pair <Mat, float> > imgToDistPairs;
+
+	for (int i = 0; i < db.size(); i++)
+	{
+		float distance = distanceSSD(queryImg, db[i]);
+		cout << "HI\n";
+		imgToDistPairs.push_back(make_pair(db[i], distance));
+	}
+
+	sort(imgToDistPairs.begin(), imgToDistPairs.end(), sortBySecondVal);
+	vector<Mat> sortedDb;
+
+	for (int i = 0; i < db.size(); i++)
+	{
+		sortedDb.push_back(imgToDistPairs[i].first);
+	}
+
+	return sortedDb;
 }
 
 int main( int argc, char *argv[] ) {
-    char dirname[256];
+    char dirName[256];
+	char searchImgName[256];
+	Mat searchImg;
 
+	// TODO: Take these defaults out??
 	// by default, look at the current directory
-	strcpy(dirname, ".");
+	strcpy(dirName, ".");
+	strcpy(searchImgName, ".");
 
-	// if the user provided a directory path, use it
-	if(argc > 1) {
-		strcpy(dirname, argv[1]);
+	// If user didn't give directory name and query image name
+	if(argc != 3) 
+	{
+		cout << "please provide a directory name and query image name!\n";
+		exit(-1);
+	}
+	strcpy(dirName, argv[1]);
+	strcpy(searchImgName, argv[2]);
+	searchImg = imread(searchImgName);
+	
+
+    vector<Mat> images = readInImageDir( dirName );
+	vector<Mat> sortedImages = sortImageDB( searchImg, images, 0);
+	cout << images.size();
+
+	for (int i = 0; i < sortedImages.size(); i++)
+	{
+		resize(sortedImages[i], sortedImages[i], Size(sortedImages[i].cols/2, sortedImages[i].rows/2));
+		namedWindow("a good window name" + to_string(i), CV_WINDOW_AUTOSIZE);
+		imshow("a good window name" + to_string(i), sortedImages[i]);
 	}
 
-    vector<Mat> images = readInImageDir( dirname );
+	waitKey(0);
 		
 	printf("\nTerminating\n");
 
