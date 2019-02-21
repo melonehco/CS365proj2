@@ -22,6 +22,9 @@
 using namespace std;
 using namespace cv;
 
+// Define a function pointer type for using different distance metrics
+typedef float (*distFuncPtr)(Mat&, Mat&);
+
 /* reads in images from the given directory and returns them in a Mat vector */
 vector<Mat> readInImageDir( const char *dirname )
 {
@@ -96,6 +99,39 @@ float distanceSSD( Mat &img1, Mat &img2 )
     return sum;
 }
 
+/* returns the sum-squared-distance of a 5x5 block of pixels
+ * in the centers of the two given images
+ */
+float otherDistance( Mat &img1, Mat &img2 )
+{
+	cout << "YOU THOUGHT IT WAS THE SSD FUNCTION, BUT IT WAS I, DIO!\n";
+
+    //coordinates of 5x5 block corners
+    int img1startX = img1.cols / 2 - 2;
+    int img1startY = img1.rows / 2 - 2;
+    int img2startX = img2.cols / 2 - 2;
+    int img2startY = img2.rows / 2 - 2;
+
+    float sum = 0;
+    float blueDiff, greenDiff, redDiff;
+    for ( int i = 0; i < 5; i++ )
+    {
+        for ( int j = 0; j < 5; j++ )
+        {
+            Vec3b color1 = img1.at<Vec3b>( img1startX + i, img1startY + j );
+            Vec3b color2 = img2.at<Vec3b>( img2startX + i, img2startY + j ); 
+
+            blueDiff = color1[0] - color2[0];
+            greenDiff = color1[1] - color2[1];
+            redDiff = color1[2] - color2[2]; 
+            sum += (blueDiff * blueDiff) + (greenDiff * greenDiff) + (redDiff * redDiff);           
+        }
+    }
+	
+
+    return sum;
+}
+
 /**
  * Returns true if the second value in the first pair is less than 
  * the second value in the second pair. Used to sort distances for sortImageDB.
@@ -108,18 +144,15 @@ bool sortBySecondVal(const pair<Mat, float> &pair1, const pair<Mat, float> &pair
 /* returns a copy of the input image database, sorted by the smallest values
  * for the given distance metric calculated from the given query image
  */
-vector<Mat> sortImageDB( Mat &queryImg, vector<Mat> &db, int distanceMetric )
+vector<Mat> sortImageDB( Mat &queryImg, vector<Mat> &db, distFuncPtr func)
 {
-    /*TODO: pass in function for distance metric*/
-
-    //calculate distance metric for each db image
+    //calculate distance metric for each db imagedfafdsfdsa
 
 	vector<pair <Mat, float> > imgToDistPairs;
 
 	for (int i = 0; i < db.size(); i++)
 	{
-		float distance = distanceSSD(queryImg, db[i]);
-		cout << "HI\n";
+		float distance = func(queryImg, db[i]);
 		imgToDistPairs.push_back(make_pair(db[i], distance));
 	}
 
@@ -137,6 +170,7 @@ vector<Mat> sortImageDB( Mat &queryImg, vector<Mat> &db, int distanceMetric )
 int main( int argc, char *argv[] ) {
     char dirName[256];
 	char searchImgName[256];
+	char funcNameString[256];
 	Mat searchImg;
 
 	// TODO: Take these defaults out??
@@ -145,18 +179,41 @@ int main( int argc, char *argv[] ) {
 	strcpy(searchImgName, ".");
 
 	// If user didn't give directory name and query image name
-	if(argc != 3) 
+	if(argc != 4) 
 	{
 		cout << "please provide a directory name and query image name!\n";
 		exit(-1);
 	}
 	strcpy(dirName, argv[1]);
 	strcpy(searchImgName, argv[2]);
+	strcpy(funcNameString, argv[3]);
+
 	searchImg = imread(searchImgName);
-	
+
+	// Map the user input strings to the functions
+	map<string, distFuncPtr> stringToFuncMap;
+	stringToFuncMap["SSD"] = &distanceSSD;
+	stringToFuncMap["OTHER"] = &otherDistance;
+
+	// Reference to which distance metric function to use
+	distFuncPtr funcToUse; 
+
+	// Check if the user's input matches a function in the map
+	if (stringToFuncMap.find(funcNameString) == stringToFuncMap.end())
+	{
+    	//there's no such function to use
+		cout << "fghjk\n";
+		exit(-1);
+	}
+	else
+	{
+		funcToUse = stringToFuncMap[funcNameString];
+	}
+
+	// Choose which kind of function to execute
 
     vector<Mat> images = readInImageDir( dirName );
-	vector<Mat> sortedImages = sortImageDB( searchImg, images, 0);
+	vector<Mat> sortedImages = sortImageDB( searchImg, images, funcToUse);
 	cout << images.size();
 
 	for (int i = 0; i < sortedImages.size(); i++)
