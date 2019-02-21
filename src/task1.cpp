@@ -18,6 +18,7 @@
 #include <vector>
 #include <algorithm>
 #include "opencv2/opencv.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
 
 using namespace std;
 using namespace cv;
@@ -132,6 +133,41 @@ float otherDistance( Mat &img1, Mat &img2 )
     return sum;
 }
 
+/* returns a distance metric for the given images based on
+ * a comparison of histograms for the full images
+ */
+float distanceBaselineHist( Mat &img1, Mat &img2 )
+{
+
+	/// Separate the images by channel ( B, G and R )
+	vector<Mat> bgr_planes1;
+	split( img1, bgr_planes1 );
+	vector<Mat> bgr_planes2;
+	split( img2, bgr_planes2 );
+
+	int histSize = 256; //number of bins
+	/// Set the ranges ( for B,G,R) )
+	float range[] = { 0, 256 } ;
+	const float* histRange = { range };
+
+	Mat img1Hist_b, img1Hist_g, img1Hist_r, img2Hist_b, img2Hist_g, img2Hist_r;
+	//       	Mat array, # imgs, channels, mask, output Mat, dims, # bins,    ranges
+	calcHist( &bgr_planes1[0], 1,     0,    Mat(), img1Hist_b,  1,   &histSize, &histRange);
+	calcHist( &bgr_planes1[1], 1,     0,    Mat(), img1Hist_g,  1,   &histSize, &histRange);
+	calcHist( &bgr_planes1[2], 1,     0,    Mat(), img1Hist_r,  1,   &histSize, &histRange);
+	calcHist( &bgr_planes2[0], 1,     0,    Mat(), img2Hist_b,  1,   &histSize, &histRange);
+	calcHist( &bgr_planes2[1], 1,     0,    Mat(), img2Hist_g,  1,   &histSize, &histRange);
+	calcHist( &bgr_planes2[2], 1,     0,    Mat(), img2Hist_r,  1,   &histSize, &histRange);
+
+	int comp_method = CV_COMP_CORREL;
+	double comp_b = compareHist(img1Hist_b, img2Hist_b, comp_method);
+	double comp_g = compareHist(img1Hist_g, img2Hist_g, comp_method);
+	double comp_r = compareHist(img1Hist_r, img2Hist_r, comp_method);
+	float comparison = (float)( (comp_b + comp_g + comp_r) / 3 );
+	
+	return comparison;
+}
+
 /**
  * Returns true if the second value in the first pair is less than 
  * the second value in the second pair. Used to sort distances for sortImageDB.
@@ -214,13 +250,19 @@ int main( int argc, char *argv[] ) {
 
     vector<Mat> images = readInImageDir( dirName );
 	vector<Mat> sortedImages = sortImageDB( searchImg, images, funcToUse);
-	cout << images.size();
 
+
+	float scaledWidth = 500;
+	float scale, scaledHeight;
 	for (int i = 0; i < sortedImages.size(); i++)
 	{
-		resize(sortedImages[i], sortedImages[i], Size(sortedImages[i].cols/2, sortedImages[i].rows/2));
-		namedWindow("a good window name" + to_string(i), CV_WINDOW_AUTOSIZE);
-		imshow("a good window name" + to_string(i), sortedImages[i]);
+		scale = scaledWidth / sortedImages[i].cols;
+		scaledHeight = sortedImages[i].rows * scale;
+		resize(sortedImages[i], sortedImages[i], Size(scaledWidth, scaledHeight));
+
+		string window_name = "match " + to_string(i);
+		namedWindow(window_name, CV_WINDOW_AUTOSIZE);
+		imshow(window_name, sortedImages[i]);
 	}
 
 	waitKey(0);
