@@ -105,7 +105,6 @@ float distanceSSD( Mat &img1, Mat &img2 )
  */
 float otherDistance( Mat &img1, Mat &img2 )
 {
-	cout << "YOU THOUGHT IT WAS THE SSD FUNCTION, BUT IT WAS I, DIO!\n";
 
     //coordinates of 5x5 block corners
     int img1startX = img1.cols / 2 - 2;
