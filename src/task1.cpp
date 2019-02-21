@@ -119,7 +119,6 @@ vector<Mat> sortImageDB( Mat &queryImg, vector<Mat> &db, int distanceMetric )
 	for (int i = 0; i < db.size(); i++)
 	{
 		float distance = distanceSSD(queryImg, db[i]);
-		cout << "HI\n";
 		imgToDistPairs.push_back(make_pair(db[i], distance));
 	}
 
@@ -157,13 +156,18 @@ int main( int argc, char *argv[] ) {
 
     vector<Mat> images = readInImageDir( dirName );
 	vector<Mat> sortedImages = sortImageDB( searchImg, images, 0);
-	cout << images.size();
 
+	float scaledWidth = 500;
+	float scale, scaledHeight;
 	for (int i = 0; i < sortedImages.size(); i++)
 	{
-		resize(sortedImages[i], sortedImages[i], Size(sortedImages[i].cols/2, sortedImages[i].rows/2));
-		namedWindow("a good window name" + to_string(i), CV_WINDOW_AUTOSIZE);
-		imshow("a good window name" + to_string(i), sortedImages[i]);
+		scale = scaledWidth / sortedImages[i].cols;
+		scaledHeight = sortedImages[i].rows * scale;
+		resize(sortedImages[i], sortedImages[i], Size(scaledWidth, scaledHeight));
+
+		string window_name = "match " + to_string(i);
+		namedWindow(window_name, CV_WINDOW_AUTOSIZE);
+		imshow(window_name, sortedImages[i]);
 	}
 
 	waitKey(0);
