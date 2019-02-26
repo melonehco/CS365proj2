@@ -17,6 +17,7 @@
 #include <cstring>
 #include <vector>
 #include <algorithm>
+#include <numeric>
 #include "opencv2/opencv.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 
@@ -100,38 +101,6 @@ float distanceSSD( Mat &img1, Mat &img2 )
     return sum;
 }
 
-/* returns the sum-squared-distance of a 5x5 block of pixels
- * in the centers of the two given images
- */
-float otherDistance( Mat &img1, Mat &img2 )
-{
-
-    //coordinates of 5x5 block corners
-    int img1startX = img1.cols / 2 - 2;
-    int img1startY = img1.rows / 2 - 2;
-    int img2startX = img2.cols / 2 - 2;
-    int img2startY = img2.rows / 2 - 2;
-
-    float sum = 0;
-    float blueDiff, greenDiff, redDiff;
-    for ( int i = 0; i < 5; i++ )
-    {
-        for ( int j = 0; j < 5; j++ )
-        {
-            Vec3b color1 = img1.at<Vec3b>( img1startX + i, img1startY + j );
-            Vec3b color2 = img2.at<Vec3b>( img2startX + i, img2startY + j ); 
-
-            blueDiff = color1[0] - color2[0];
-            greenDiff = color1[1] - color2[1];
-            redDiff = color1[2] - color2[2]; 
-            sum += (blueDiff * blueDiff) + (greenDiff * greenDiff) + (redDiff * redDiff);           
-        }
-    }
-	
-
-    return sum;
-}
-
 /* returns a distance metric for the given images based on
  * a comparison of histograms for the full images
  */
@@ -165,6 +134,33 @@ float distanceBaselineHist( Mat &img1, Mat &img2 )
 	float comparison = (float)( (comp_b + comp_g + comp_r) / 3 );
 	
 	return comparison;
+}
+
+/* returns a distance metric for the given images based on
+ * a comparison of multiple histograms on each image
+ */
+float distanceMultHist( Mat &img1, Mat &img2 )
+{
+	int numXDivisions = 2;
+	int numYDivisions = 2;
+	int subsectionWidth  = img1.cols/numXDivisions;
+	int subsectionHeight = img1.rows/numYDivisions;;
+	vector<float> compResults;
+	for (int i = 0; i < numYDivisions; i++ )
+	{
+		for (int j = 0; j < numXDivisions; j++ )
+		{
+			Mat croppedImg1 (img1, Rect(i*subsectionWidth, j*subsectionHeight, 
+										  subsectionWidth, subsectionHeight));
+			Mat croppedImg2 (img2, Rect(i*subsectionWidth, j*subsectionHeight, 
+								subsectionWidth, subsectionHeight));	
+			compResults.push_back(distanceBaselineHist(croppedImg1, croppedImg2));						  
+		}
+	}
+	// make sure to use 0.0 instead of 0; otherwise they will be summed as ints
+	float sum = std::accumulate(compResults.begin(), compResults.end(), 0.0);
+	float average = sum/(numXDivisions * numYDivisions);
+	return average;
 }
 
 /**
@@ -228,7 +224,8 @@ int main( int argc, char *argv[] ) {
 	// Map the user input strings to the functions
 	map<string, distFuncPtr> stringToFuncMap;
 	stringToFuncMap["SSD"] = &distanceSSD;
-	stringToFuncMap["OTHER"] = &otherDistance;
+	stringToFuncMap["HIST"] = &distanceBaselineHist;
+	stringToFuncMap["MULTHIST"] = &distanceMultHist;
 
 	// Reference to which distance metric function to use
 	distFuncPtr funcToUse; 
@@ -237,7 +234,7 @@ int main( int argc, char *argv[] ) {
 	if (stringToFuncMap.find(funcNameString) == stringToFuncMap.end())
 	{
     	//there's no such function to use
-		cout << "fghjk\n";
+		cout << "There is no such function\n";
 		exit(-1);
 	}
 	else
