@@ -169,6 +169,9 @@ float distanceMultHist( Mat &img1, Mat &img2 )
  */
 float distanceTextureColor( Mat &img1, Mat &img2 )
 {
+	//get color component from baseline histogram metric
+	float colorDist = distanceBaselineHist( img1, img2 );
+	
 	Mat imgOne, imgTwo; //local copies of images for modification
 
 	//blur to reduce noise (src, dst, kernel size, sigmaX & sigmaY from given size)
@@ -218,7 +221,7 @@ float distanceTextureColor( Mat &img1, Mat &img2 )
 	double comp_y = compareHist(img1Hist_y, img2Hist_y, comp_method);
 	float comparison = (float)( (comp_x + comp_y) / 2 );
 
-	return comparison;
+	return colorDist + comparison;
 }
 
 /**
