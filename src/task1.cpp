@@ -163,6 +163,64 @@ float distanceMultHist( Mat &img1, Mat &img2 )
 	return average;
 }
 
+/* returns a distance metric for the given images based on
+ * a comparison of the texture and color of each image,
+ * using histograms and Sobel derivatives
+ */
+float distanceTextureColor( Mat &img1, Mat &img2 )
+{
+	Mat imgOne, imgTwo; //local copies of images for modification
+
+	//blur to reduce noise (src, dst, kernel size, sigmaX & sigmaY from given size)
+	GaussianBlur( img1, imgOne, Size(3,3), 0, 0);
+	GaussianBlur( img2, imgTwo, Size(3,3), 0, 0);
+
+	//convert to grayscale
+	cvtColor( imgOne, imgOne, CV_BGR2GRAY );
+	cvtColor( imgTwo, imgTwo, CV_BGR2GRAY );
+
+	//apply Sobel
+	Mat grad_x_1, grad_y_1; //gradient output in x and y directions
+	Mat grad_x_2, grad_y_2;
+	int ddepth = CV_16S; //output image depth
+
+	/* Gradient X (src, dst, output depth,
+					1st-order derivative for x, none for y, kernel size (3 is default)) 
+	 */
+	Sobel( imgOne, grad_x_1, ddepth, 1, 0, 3);
+	// Gradient Y (swapped which direction gets the 1)
+	Sobel( imgOne, grad_y_1, ddepth, 0, 1, 3);
+	Sobel( imgTwo, grad_x_2, ddepth, 1, 0, 3);
+	Sobel( imgTwo, grad_y_2, ddepth, 0, 1, 3);
+
+	//scale, get absolute value, convert to unsigned 8-bit
+	Mat xGrad1, yGrad1, xGrad2, yGrad2;
+	convertScaleAbs( grad_x_1, xGrad1 );
+	convertScaleAbs( grad_y_1, yGrad1 );
+	convertScaleAbs( grad_x_2, xGrad2 );
+	convertScaleAbs( grad_y_2, yGrad2 );
+
+	//calculate histograms of x and y gradient magnitude
+	int histSize = 8; //number of bins
+	float range[] = { 0, 256 } ;
+	const float* histRange = { range };
+
+	Mat img1Hist_x, img1Hist_y, img2Hist_x, img2Hist_y;
+	//        Mat array, # imgs, channels, mask, output Mat, dims, # bins,    ranges
+	calcHist( &xGrad1,   1,      0,       Mat(), img1Hist_x, 1,   &histSize, &histRange);
+	calcHist( &yGrad1,   1,      0,       Mat(), img1Hist_y, 1,   &histSize, &histRange);
+	calcHist( &xGrad2,   1,      0,       Mat(), img2Hist_x, 1,   &histSize, &histRange);
+	calcHist( &yGrad2,   1,      0,       Mat(), img2Hist_y, 1,   &histSize, &histRange);
+
+	//compare histograms
+	int comp_method = CV_COMP_CORREL;
+	double comp_x = compareHist(img1Hist_x, img2Hist_x, comp_method);
+	double comp_y = compareHist(img1Hist_y, img2Hist_y, comp_method);
+	float comparison = (float)( (comp_x + comp_y) / 2 );
+
+	return comparison;
+}
+
 /**
  * Returns true if the second value in the first pair is less than 
  * the second value in the second pair. Used to sort distances for sortImageDB.
@@ -204,6 +262,7 @@ int main( int argc, char *argv[] ) {
 	char funcNameString[256];
 	Mat searchImg;
 
+	//TODO: add command-line argument for # output images
 	// TODO: Take these defaults out??
 	// by default, look at the current directory
 	strcpy(dirName, ".");
@@ -226,6 +285,7 @@ int main( int argc, char *argv[] ) {
 	stringToFuncMap["SSD"] = &distanceSSD;
 	stringToFuncMap["HIST"] = &distanceBaselineHist;
 	stringToFuncMap["MULTHIST"] = &distanceMultHist;
+	stringToFuncMap["TEXCOL"] = &distanceTextureColor;
 
 	// Reference to which distance metric function to use
 	distFuncPtr funcToUse; 
@@ -250,7 +310,7 @@ int main( int argc, char *argv[] ) {
 
 	float scaledWidth = 500;
 	float scale, scaledHeight;
-	for (int i = 0; i < sortedImages.size(); i++)
+	for (int i = 0; i < 10; i++)
 	{
 		scale = scaledWidth / sortedImages[i].cols;
 		scaledHeight = sortedImages[i].rows * scale;
