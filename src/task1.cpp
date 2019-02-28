@@ -113,7 +113,7 @@ float distanceBaselineHist( Mat &img1, Mat &img2 )
 	vector<Mat> bgr_planes2;
 	split( img2, bgr_planes2 );
 
-	int histSize = 256; //number of bins
+	int histSize = 32; //number of bins
 	/// Set the ranges ( for B,G,R) )
 	float range[] = { 0, 256 } ;
 	const float* histRange = { range };
@@ -126,6 +126,15 @@ float distanceBaselineHist( Mat &img1, Mat &img2 )
 	calcHist( &bgr_planes2[0], 1,     0,    Mat(), img2Hist_b,  1,   &histSize, &histRange);
 	calcHist( &bgr_planes2[1], 1,     0,    Mat(), img2Hist_g,  1,   &histSize, &histRange);
 	calcHist( &bgr_planes2[2], 1,     0,    Mat(), img2Hist_r,  1,   &histSize, &histRange);
+
+	int normRange = 1;
+	//          src          dst     min    max      norm type  same data type
+	normalize(img1Hist_b, img1Hist_b, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img1Hist_g, img1Hist_g, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img1Hist_r, img1Hist_r, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_b, img2Hist_b, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_g, img2Hist_g, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_r, img2Hist_r, 0, normRange, NORM_MINMAX, -1 );
 
 	int comp_method = CV_COMP_CORREL;
 	double comp_b = compareHist(img1Hist_b, img2Hist_b, comp_method);
@@ -167,15 +176,11 @@ float distanceMultHist( Mat &img1, Mat &img2 )
 	return average;
 }
 
-/* returns a distance metric for the given images based on
- * a comparison of the texture and color of each image,
- * using histograms and Sobel derivatives
+/* helper function that returns a comparison metric for the Sobel filter
+ * results of the two given images
  */
-float distanceTextureColor( Mat &img1, Mat &img2 )
+double compareSobelHist( Mat &img1, Mat &img2 )
 {
-	//get color component from baseline histogram metric
-	float colorDist = distanceBaselineHist( img1, img2 );
-	
 	Mat imgOne, imgTwo; //local copies of images for modification
 
 	//blur to reduce noise (src, dst, kernel size, sigmaX & sigmaY from given size)
@@ -223,9 +228,75 @@ float distanceTextureColor( Mat &img1, Mat &img2 )
 	int comp_method = CV_COMP_CORREL;
 	double comp_x = compareHist(img1Hist_x, img2Hist_x, comp_method);
 	double comp_y = compareHist(img1Hist_y, img2Hist_y, comp_method);
-	float comparison = (float)( (comp_x + comp_y) / 2 );
+	double comparison = (comp_x + comp_y) / 2;
 
-	return colorDist + comparison;
+	return comparison;
+}
+
+/* returns a distance metric for the given images based on
+ * a comparison of the texture and color of each image,
+ * using histograms and Sobel derivatives
+ */
+float distanceTextureColor( Mat &img1, Mat &img2 )
+{
+	//get color component from baseline histogram metric
+	float colorDist = distanceBaselineHist( img1, img2 );
+	
+	float textureDist = (float) compareSobelHist( img1, img2 );
+
+	return colorDist + textureDist;
+}
+
+/* returns a distance metric for the given images based on
+ * a comparison of the texture (by Sobel filter) and color
+ * (in HSV) of each image
+ */
+float distanceCustom( Mat &img1, Mat &img2 )
+{
+	//convert to HSV
+	Mat imgOne, imgTwo; //local copies of images for modification
+	cvtColor( img1, imgOne, COLOR_BGR2HSV );
+	cvtColor( img2, imgTwo, COLOR_BGR2HSV );
+	
+	/// Separate the images by channel
+	vector<Mat> hsv_planes1;
+	split( imgOne, hsv_planes1 );
+	vector<Mat> hsv_planes2;
+	split( imgTwo, hsv_planes2 );
+
+	int histSize = 256; //number of bins
+	/// Set the ranges ( for B,G,R) )
+	float range[] = { 0, 256 } ;
+	const float* histRange = { range };
+
+	Mat img1Hist_h, img1Hist_s, img1Hist_v, img2Hist_h, img2Hist_s, img2Hist_v;
+	//       	Mat array, # imgs, channels, mask, output Mat, dims, # bins,    ranges
+	calcHist( &hsv_planes1[0], 1,     0,    Mat(), img1Hist_h,  1,   &histSize, &histRange);
+	calcHist( &hsv_planes1[1], 1,     0,    Mat(), img1Hist_s,  1,   &histSize, &histRange);
+	calcHist( &hsv_planes1[2], 1,     0,    Mat(), img1Hist_v,  1,   &histSize, &histRange);
+	calcHist( &hsv_planes2[0], 1,     0,    Mat(), img2Hist_h,  1,   &histSize, &histRange);
+	calcHist( &hsv_planes2[1], 1,     0,    Mat(), img2Hist_s,  1,   &histSize, &histRange);
+	calcHist( &hsv_planes2[2], 1,     0,    Mat(), img2Hist_v,  1,   &histSize, &histRange);
+
+	int normRange = 1;
+	//          src          dst     min    max      norm type  same data type
+	normalize(img1Hist_h, img1Hist_h, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img1Hist_s, img1Hist_s, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img1Hist_v, img1Hist_v, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_h, img2Hist_h, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_s, img2Hist_s, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_v, img2Hist_v, 0, normRange, NORM_MINMAX, -1 );
+
+	int comp_method = CV_COMP_CORREL;
+	double comp_h = compareHist(img1Hist_h, img2Hist_h, comp_method);
+	double comp_s = compareHist(img1Hist_s, img2Hist_s, comp_method);
+	double comp_v = compareHist(img1Hist_v, img2Hist_v, comp_method);
+	float comparison = (float)( (comp_h + comp_s + comp_v) / 3 );
+
+	//get texture component
+	float textureComp = (float) compareSobelHist( img1, img2 );
+	
+	return comparison + textureComp;
 }
 
 /**
@@ -293,6 +364,7 @@ int main( int argc, char *argv[] ) {
 	stringToFuncMap["HIST"] = &distanceBaselineHist;
 	stringToFuncMap["MULTHIST"] = &distanceMultHist;
 	stringToFuncMap["TEXCOL"] = &distanceTextureColor;
+	stringToFuncMap["CUSTOM"] = &distanceCustom;
 
 	// Reference to which distance metric function to use
 	distFuncPtr funcToUse; 
