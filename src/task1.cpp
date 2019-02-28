@@ -113,7 +113,7 @@ float distanceBaselineHist( Mat &img1, Mat &img2 )
 	vector<Mat> bgr_planes2;
 	split( img2, bgr_planes2 );
 
-	int histSize = 256; //number of bins
+	int histSize = 32; //number of bins
 	/// Set the ranges ( for B,G,R) )
 	float range[] = { 0, 256 } ;
 	const float* histRange = { range };
@@ -126,6 +126,15 @@ float distanceBaselineHist( Mat &img1, Mat &img2 )
 	calcHist( &bgr_planes2[0], 1,     0,    Mat(), img2Hist_b,  1,   &histSize, &histRange);
 	calcHist( &bgr_planes2[1], 1,     0,    Mat(), img2Hist_g,  1,   &histSize, &histRange);
 	calcHist( &bgr_planes2[2], 1,     0,    Mat(), img2Hist_r,  1,   &histSize, &histRange);
+
+	int normRange = 1;
+	//          src          dst     min    max      norm type  same data type
+	normalize(img1Hist_b, img1Hist_b, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img1Hist_g, img1Hist_g, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img1Hist_r, img1Hist_r, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_b, img2Hist_b, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_g, img2Hist_g, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_r, img2Hist_r, 0, normRange, NORM_MINMAX, -1 );
 
 	int comp_method = CV_COMP_CORREL;
 	double comp_b = compareHist(img1Hist_b, img2Hist_b, comp_method);
@@ -143,24 +152,151 @@ float distanceMultHist( Mat &img1, Mat &img2 )
 {
 	int numXDivisions = 2;
 	int numYDivisions = 2;
-	int subsectionWidth  = img1.cols/numXDivisions;
-	int subsectionHeight = img1.rows/numYDivisions;;
+	int subsectionWidth1  = img1.cols/numXDivisions;
+	int subsectionHeight1 = img1.rows/numYDivisions;
+	int subsectionWidth2  = img2.cols/numXDivisions;
+	int subsectionHeight2 = img2.rows/numYDivisions;
 	vector<float> compResults;
+
 	for (int i = 0; i < numYDivisions; i++ )
 	{
 		for (int j = 0; j < numXDivisions; j++ )
 		{
-			Mat croppedImg1 (img1, Rect(i*subsectionWidth, j*subsectionHeight, 
-										  subsectionWidth, subsectionHeight));
-			Mat croppedImg2 (img2, Rect(i*subsectionWidth, j*subsectionHeight, 
-								subsectionWidth, subsectionHeight));	
+			Mat croppedImg1 (img1, Rect(i*subsectionWidth1, j*subsectionHeight1, 
+										  subsectionWidth1, subsectionHeight1));
+			Mat croppedImg2 (img2, Rect(i*subsectionWidth2, j*subsectionHeight2, 
+								subsectionWidth2, subsectionHeight2));
 			compResults.push_back(distanceBaselineHist(croppedImg1, croppedImg2));						  
 		}
 	}
+	
 	// make sure to use 0.0 instead of 0; otherwise they will be summed as ints
 	float sum = std::accumulate(compResults.begin(), compResults.end(), 0.0);
 	float average = sum/(numXDivisions * numYDivisions);
 	return average;
+}
+
+/* helper function that returns a comparison metric for the Sobel filter
+ * results of the two given images
+ */
+double compareSobelHist( Mat &img1, Mat &img2 )
+{
+	Mat imgOne, imgTwo; //local copies of images for modification
+
+	//blur to reduce noise (src, dst, kernel size, sigmaX & sigmaY from given size)
+	GaussianBlur( img1, imgOne, Size(3,3), 0, 0);
+	GaussianBlur( img2, imgTwo, Size(3,3), 0, 0);
+
+	//convert to grayscale
+	cvtColor( imgOne, imgOne, CV_BGR2GRAY );
+	cvtColor( imgTwo, imgTwo, CV_BGR2GRAY );
+
+	//apply Sobel
+	Mat grad_x_1, grad_y_1; //gradient output in x and y directions
+	Mat grad_x_2, grad_y_2;
+	int ddepth = CV_16S; //output image depth
+
+	/* Gradient X (src, dst, output depth,
+					1st-order derivative for x, none for y, kernel size (3 is default)) 
+	 */
+	Sobel( imgOne, grad_x_1, ddepth, 1, 0, 3);
+	// Gradient Y (swapped which direction gets the 1)
+	Sobel( imgOne, grad_y_1, ddepth, 0, 1, 3);
+	Sobel( imgTwo, grad_x_2, ddepth, 1, 0, 3);
+	Sobel( imgTwo, grad_y_2, ddepth, 0, 1, 3);
+
+	//scale, get absolute value, convert to unsigned 8-bit
+	Mat xGrad1, yGrad1, xGrad2, yGrad2;
+	convertScaleAbs( grad_x_1, xGrad1 );
+	convertScaleAbs( grad_y_1, yGrad1 );
+	convertScaleAbs( grad_x_2, xGrad2 );
+	convertScaleAbs( grad_y_2, yGrad2 );
+
+	//calculate histograms of x and y gradient magnitude
+	int histSize = 8; //number of bins
+	float range[] = { 0, 256 } ;
+	const float* histRange = { range };
+
+	Mat img1Hist_x, img1Hist_y, img2Hist_x, img2Hist_y;
+	//        Mat array, # imgs, channels, mask, output Mat, dims, # bins,    ranges
+	calcHist( &xGrad1,   1,      0,       Mat(), img1Hist_x, 1,   &histSize, &histRange);
+	calcHist( &yGrad1,   1,      0,       Mat(), img1Hist_y, 1,   &histSize, &histRange);
+	calcHist( &xGrad2,   1,      0,       Mat(), img2Hist_x, 1,   &histSize, &histRange);
+	calcHist( &yGrad2,   1,      0,       Mat(), img2Hist_y, 1,   &histSize, &histRange);
+
+	//compare histograms
+	int comp_method = CV_COMP_CORREL;
+	double comp_x = compareHist(img1Hist_x, img2Hist_x, comp_method);
+	double comp_y = compareHist(img1Hist_y, img2Hist_y, comp_method);
+	double comparison = (comp_x + comp_y) / 2;
+
+	return comparison;
+}
+
+/* returns a distance metric for the given images based on
+ * a comparison of the texture and color of each image,
+ * using histograms and Sobel derivatives
+ */
+float distanceTextureColor( Mat &img1, Mat &img2 )
+{
+	//get color component from baseline histogram metric
+	float colorDist = distanceBaselineHist( img1, img2 );
+	
+	float textureDist = (float) compareSobelHist( img1, img2 );
+
+	return colorDist + textureDist;
+}
+
+/* returns a distance metric for the given images based on
+ * a comparison of the texture (by Sobel filter) and color
+ * (in HSV) of each image
+ */
+float distanceCustom( Mat &img1, Mat &img2 )
+{
+	//convert to HSV
+	Mat imgOne, imgTwo; //local copies of images for modification
+	cvtColor( img1, imgOne, COLOR_BGR2HSV );
+	cvtColor( img2, imgTwo, COLOR_BGR2HSV );
+	
+	/// Separate the images by channel
+	vector<Mat> hsv_planes1;
+	split( imgOne, hsv_planes1 );
+	vector<Mat> hsv_planes2;
+	split( imgTwo, hsv_planes2 );
+
+	int histSize = 256; //number of bins
+	/// Set the ranges ( for B,G,R) )
+	float range[] = { 0, 256 } ;
+	const float* histRange = { range };
+
+	Mat img1Hist_h, img1Hist_s, img1Hist_v, img2Hist_h, img2Hist_s, img2Hist_v;
+	//       	Mat array, # imgs, channels, mask, output Mat, dims, # bins,    ranges
+	calcHist( &hsv_planes1[0], 1,     0,    Mat(), img1Hist_h,  1,   &histSize, &histRange);
+	calcHist( &hsv_planes1[1], 1,     0,    Mat(), img1Hist_s,  1,   &histSize, &histRange);
+	calcHist( &hsv_planes1[2], 1,     0,    Mat(), img1Hist_v,  1,   &histSize, &histRange);
+	calcHist( &hsv_planes2[0], 1,     0,    Mat(), img2Hist_h,  1,   &histSize, &histRange);
+	calcHist( &hsv_planes2[1], 1,     0,    Mat(), img2Hist_s,  1,   &histSize, &histRange);
+	calcHist( &hsv_planes2[2], 1,     0,    Mat(), img2Hist_v,  1,   &histSize, &histRange);
+
+	int normRange = 1;
+	//          src          dst     min    max      norm type  same data type
+	normalize(img1Hist_h, img1Hist_h, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img1Hist_s, img1Hist_s, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img1Hist_v, img1Hist_v, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_h, img2Hist_h, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_s, img2Hist_s, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_v, img2Hist_v, 0, normRange, NORM_MINMAX, -1 );
+
+	int comp_method = CV_COMP_CORREL;
+	double comp_h = compareHist(img1Hist_h, img2Hist_h, comp_method);
+	double comp_s = compareHist(img1Hist_s, img2Hist_s, comp_method);
+	double comp_v = compareHist(img1Hist_v, img2Hist_v, comp_method);
+	float comparison = (float)( (comp_h + comp_s + comp_v) / 3 );
+
+	//get texture component
+	float textureComp = (float) compareSobelHist( img1, img2 );
+	
+	return comparison + textureComp;
 }
 
 /**
@@ -268,6 +404,7 @@ int main( int argc, char *argv[] ) {
 	char funcNameString[256];
 	Mat searchImg;
 
+	//TODO: add command-line argument for # output images
 	// TODO: Take these defaults out??
 	// by default, look at the current directory
 	strcpy(dirName, ".");
@@ -290,6 +427,8 @@ int main( int argc, char *argv[] ) {
 	stringToFuncMap["SSD"] = &distanceSSD;
 	stringToFuncMap["HIST"] = &distanceBaselineHist;
 	stringToFuncMap["MULTHIST"] = &distanceMultHist;
+	stringToFuncMap["TEXCOL"] = &distanceTextureColor;
+	stringToFuncMap["CUSTOM"] = &distanceCustom;
 
 	// Reference to which distance metric function to use
 	distFuncPtr funcToUse; 
