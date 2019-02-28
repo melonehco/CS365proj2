@@ -143,20 +143,24 @@ float distanceMultHist( Mat &img1, Mat &img2 )
 {
 	int numXDivisions = 2;
 	int numYDivisions = 2;
-	int subsectionWidth  = img1.cols/numXDivisions;
-	int subsectionHeight = img1.rows/numYDivisions;;
+	int subsectionWidth1  = img1.cols/numXDivisions;
+	int subsectionHeight1 = img1.rows/numYDivisions;
+	int subsectionWidth2  = img2.cols/numXDivisions;
+	int subsectionHeight2 = img2.rows/numYDivisions;
 	vector<float> compResults;
+
 	for (int i = 0; i < numYDivisions; i++ )
 	{
 		for (int j = 0; j < numXDivisions; j++ )
 		{
-			Mat croppedImg1 (img1, Rect(i*subsectionWidth, j*subsectionHeight, 
-										  subsectionWidth, subsectionHeight));
-			Mat croppedImg2 (img2, Rect(i*subsectionWidth, j*subsectionHeight, 
-								subsectionWidth, subsectionHeight));	
+			Mat croppedImg1 (img1, Rect(i*subsectionWidth1, j*subsectionHeight1, 
+										  subsectionWidth1, subsectionHeight1));
+			Mat croppedImg2 (img2, Rect(i*subsectionWidth2, j*subsectionHeight2, 
+								subsectionWidth2, subsectionHeight2));
 			compResults.push_back(distanceBaselineHist(croppedImg1, croppedImg2));						  
 		}
 	}
+	
 	// make sure to use 0.0 instead of 0; otherwise they will be summed as ints
 	float sum = std::accumulate(compResults.begin(), compResults.end(), 0.0);
 	float average = sum/(numXDivisions * numYDivisions);
