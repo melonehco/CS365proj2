@@ -28,7 +28,9 @@ using namespace cv;
 // Define a function pointer type for using different distance metrics
 typedef float (*distFuncPtr)(Mat&, Mat&);
 
-/* reads in images from the given directory and returns them in a Mat vector */
+/**
+ * Reads in images from the given directory and returns them in a Mat vector 
+ */
 vector<Mat> readInImageDir( const char *dirname )
 {
 	DIR *dirp;
@@ -72,7 +74,8 @@ vector<Mat> readInImageDir( const char *dirname )
     return images;
 }
 
-/* returns the sum-squared-distance of a 5x5 block of pixels
+/**
+ * Returns the sum-squared-distance of a 5x5 block of pixels
  * in the centers of the two given images
  */
 float distanceSSD( Mat &img1, Mat &img2 )
@@ -102,7 +105,8 @@ float distanceSSD( Mat &img1, Mat &img2 )
     return sum;
 }
 
-/* returns a distance metric for the given images based on
+/**
+ * Returns a distance metric for the given images based on
  * a comparison of histograms for the full images
  */
 float distanceBaselineHist( Mat &img1, Mat &img2 )
@@ -146,7 +150,8 @@ float distanceBaselineHist( Mat &img1, Mat &img2 )
 	return comparison;
 }
 
-/* returns a distance metric for the given images based on
+/**
+ * Returns a distance metric for the given images based on
  * a comparison of multiple histograms on each image
  */
 float distanceMultHist( Mat &img1, Mat &img2 )
@@ -177,7 +182,8 @@ float distanceMultHist( Mat &img1, Mat &img2 )
 	return average;
 }
 
-/* helper function that returns a comparison metric for the Sobel filter
+/**
+ * Helper function that returns a comparison metric for the Sobel filter
  * results of the two given images
  */
 double compareSobelHist( Mat &img1, Mat &img2 )
@@ -234,7 +240,8 @@ double compareSobelHist( Mat &img1, Mat &img2 )
 	return comparison;
 }
 
-/* returns a distance metric for the given images based on
+/**
+ * Returns a distance metric for the given images based on
  * a comparison of the texture and color of each image,
  * using histograms and Sobel derivatives
  */
@@ -248,7 +255,8 @@ float distanceTextureColor( Mat &img1, Mat &img2 )
 	return colorDist + textureDist;
 }
 
-/* returns a distance metric for the given images based on
+/**
+ * Returns a distance metric for the given images based on
  * a comparison of the texture (by Sobel filter) and color
  * (in HSV) of each image
  */
@@ -300,7 +308,8 @@ float distanceCustom( Mat &img1, Mat &img2 )
 	return comparison + textureComp;
 }
 
-/* returns a distance metric for the given images based on
+/** 
+ * Returns a distance metric for the given images based on
  * comparing their texture (by gradient orientation) and
  * their color (as HSV)
  */
@@ -375,12 +384,13 @@ bool sortBySecondVal(const pair<Mat, float> &pair1, const pair<Mat, float> &pair
 	return (pair1.second < pair2.second);
 }
 
-/* returns a copy of the input image database, sorted by the smallest values
+/**
+ * Returns a copy of the input image database, sorted by the smallest values
  * for the given distance metric calculated from the given query image
  */
 vector<Mat> sortImageDB( Mat &queryImg, vector<Mat> &db, distFuncPtr func)
 {
-    //calculate distance metric for each db imagedfafdsfdsa
+    //calculate distance metric for each db image
 
 	vector<pair <Mat, float> > imgToDistPairs;
 
@@ -402,7 +412,7 @@ vector<Mat> sortImageDB( Mat &queryImg, vector<Mat> &db, distFuncPtr func)
 }
 
 /**
- * Displays both the query imagea and all of the result images in different windows
+ * Displays both the query image and all of the result images in different windows
  */
 void displayImgsInSeparateWindows(vector<Mat> images)
 {
@@ -424,7 +434,7 @@ void displayImgsInSeparateWindows(vector<Mat> images)
 /**
  * Displays both the query image and all of the result images in the same window
  */
-void displayImgsSameWindow(vector<Mat> images)
+void displayImgsInSameWindow(vector<Mat> images)
 {
 	int numRows, numCols;
 	int imgsSqrt = (int)sqrt(images.size());
@@ -452,6 +462,7 @@ void displayImgsSameWindow(vector<Mat> images)
 			curImgIdx ++;
 		}
 	}
+
 	// Shrink the collective image down after all smaller images are in it
 	float scaledWidth = 600;
 	float scale, scaledHeight;
@@ -477,8 +488,8 @@ vector<Mat> truncateMatVector(vector<Mat> images, int vectorSize)
 	{
 		vectorSize = images.size()-1;  
 	}
-	// plus 1 to exclude the query image that appears first
-	vector<Mat> shorterVector(images.begin(), images.begin()+ vectorSize + 1);
+	
+	vector<Mat> shorterVector(images.begin(), images.begin()+ vectorSize);
 	return shorterVector;
 }
 
@@ -489,11 +500,6 @@ int main( int argc, char *argv[] ) {
 
 	int numImgsToShow = -1; // -1 is the default, meaning all images will be shown
 	Mat searchImg;
-
-	// TODO: Take these defaults out??
-	// by default, look at the current directory
-	strcpy(dirName, ".");
-	strcpy(searchImgName, ".");
 
 	// If user didn't give directory name and query image name
 	if(argc < 4) 
@@ -507,7 +513,7 @@ int main( int argc, char *argv[] ) {
 
 	if (argc > 4) // if only showing first N images
 	{
-		numImgsToShow = std::stoi(argv[4]); // TODO: Throw error for non-int user input
+		numImgsToShow = std::stoi(argv[4]);
 	}
 
 	searchImg = imread(searchImgName);
@@ -542,6 +548,7 @@ int main( int argc, char *argv[] ) {
 	vector<Mat> allSortedImages = sortImageDB( searchImg, images, funcToUse);
 
 	vector<Mat> sortedImages;
+
 	// Choose whether to show all or just first N images
 	if (numImgsToShow != -1)
 	{
@@ -553,7 +560,7 @@ int main( int argc, char *argv[] ) {
 	}
 	
 	//displayImgsInSeparateWindows(sortedImages);
-	displayImgsSameWindow(sortedImages);
+	displayImgsInSameWindow(sortedImages);
 
 	waitKey(0);
 		
