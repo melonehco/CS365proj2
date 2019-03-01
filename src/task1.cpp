@@ -279,7 +279,7 @@ float distanceCustom( Mat &img1, Mat &img2 )
 	calcHist( &hsv_planes2[2], 1,     0,    Mat(), img2Hist_v,  1,   &histSize, &histRange);
 
 	int normRange = 1;
-	//          src          dst     min    max      norm type  same data type
+	//          src          dst     min    max      norm type  use same data type as src
 	normalize(img1Hist_h, img1Hist_h, 0, normRange, NORM_MINMAX, -1 );
 	normalize(img1Hist_s, img1Hist_s, 0, normRange, NORM_MINMAX, -1 );
 	normalize(img1Hist_v, img1Hist_v, 0, normRange, NORM_MINMAX, -1 );
@@ -297,6 +297,72 @@ float distanceCustom( Mat &img1, Mat &img2 )
 	float textureComp = (float) compareSobelHist( img1, img2 );
 	
 	return comparison + textureComp;
+}
+
+/* returns a distance metric for the given images based on
+ * comparing their texture (by gradient orientation) and
+ * their color (as HSV)
+ */
+float distanceGradOrient( Mat &img1, Mat &img2 )
+{
+	Mat imgOne, imgTwo; //local copies of images for modification
+
+	//blur to reduce noise (src, dst, kernel size, sigmaX & sigmaY from given size)
+	GaussianBlur( img1, imgOne, Size(3,3), 0, 0);
+	GaussianBlur( img2, imgTwo, Size(3,3), 0, 0);
+
+	//convert to grayscale
+	cvtColor( imgOne, imgOne, CV_BGR2GRAY );
+	cvtColor( imgTwo, imgTwo, CV_BGR2GRAY );
+
+	//apply Sobel
+	Mat grad_x_1, grad_y_1; //gradient output in x and y directions
+	Mat grad_x_2, grad_y_2;
+	int ddepth = CV_16S; //output image depth
+
+	/* Gradient X (src, dst, output depth,
+					1st-order derivative for x, none for y, kernel size (3 is default)) 
+	 */
+	Sobel( imgOne, grad_x_1, ddepth, 1, 0, 3);
+	// Gradient Y (swapped which direction gets the 1)
+	Sobel( imgOne, grad_y_1, ddepth, 0, 1, 3);
+	Sobel( imgTwo, grad_x_2, ddepth, 1, 0, 3);
+	Sobel( imgTwo, grad_y_2, ddepth, 0, 1, 3);
+
+	grad_x_1.convertTo( grad_x_1, CV_32F );
+	grad_x_2.convertTo( grad_x_2, CV_32F );
+	grad_y_1.convertTo( grad_y_1, CV_32F );
+	grad_y_2.convertTo( grad_y_2, CV_32F );
+
+	//use Sobel output to find gradient orientation
+	Mat angles1, angles2;
+	angles1.create( img1.size(), img1.type() );
+	angles2.create( img2.size(), img2.type() );
+	phase(grad_x_1, grad_y_1, angles1, true);
+	phase(grad_x_2, grad_y_2, angles2, true);
+
+	int histSize = 24; //number of bins
+	/// Set the ranges
+	float range[] = { 0, 360 } ;
+	const float* histRange = { range };
+
+	Mat img1Hist_grad, img2Hist_grad;
+	//       	Mat array, # imgs, channels, mask, output Mat, dims, # bins,    ranges
+	calcHist( &angles1, 1,     0,    Mat(), img1Hist_grad,  1,   &histSize, &histRange);
+	calcHist( &angles2, 1,     0,    Mat(), img2Hist_grad,  1,   &histSize, &histRange);
+
+	int normRange = 1;
+	//          src                dst     min    max      norm type  same data type
+	normalize(img1Hist_grad, img1Hist_grad, 0, normRange, NORM_MINMAX, -1 );
+	normalize(img2Hist_grad, img2Hist_grad, 0, normRange, NORM_MINMAX, -1 );
+
+	int comp_method = CV_COMP_CORREL;
+	float comp = (float) compareHist(img1Hist_grad, img2Hist_grad, comp_method);
+
+	//get color component from baseline histogram metric
+	float colorDist = distanceBaselineHist( img1, img2 );
+
+	return comp + colorDist;
 }
 
 /**
@@ -365,6 +431,7 @@ int main( int argc, char *argv[] ) {
 	stringToFuncMap["MULTHIST"] = &distanceMultHist;
 	stringToFuncMap["TEXCOL"] = &distanceTextureColor;
 	stringToFuncMap["CUSTOM"] = &distanceCustom;
+	stringToFuncMap["GRADORIENT"] = &distanceGradOrient;
 
 	// Reference to which distance metric function to use
 	distFuncPtr funcToUse; 
@@ -381,11 +448,10 @@ int main( int argc, char *argv[] ) {
 		funcToUse = stringToFuncMap[funcNameString];
 	}
 
-	// Choose which kind of function to execute
-
     vector<Mat> images = readInImageDir( dirName );
-	vector<Mat> sortedImages = sortImageDB( searchImg, images, funcToUse);
 
+	cout << "Sorting image db...\n\n";
+	vector<Mat> sortedImages = sortImageDB( searchImg, images, funcToUse);
 
 	float scaledWidth = 500;
 	float scale, scaledHeight;
