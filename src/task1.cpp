@@ -400,6 +400,70 @@ vector<Mat> sortImageDB( Mat &queryImg, vector<Mat> &db, distFuncPtr func)
 	return sortedDb;
 }
 
+/**
+ * Displays both the query imagea and all of the result images in different windows
+ */
+void displayImgsInSeparateWindows(vector<Mat> images)
+{
+	float scaledWidth = 500;
+	float scale, scaledHeight;
+
+	for (int i = 0; i < images.size(); i++)
+	{
+		scale = scaledWidth / images[i].cols;
+		scaledHeight = images[i].rows * scale;
+		resize(images[i], images[i], Size(scaledWidth, scaledHeight));
+
+		string window_name = "match " + to_string(i);
+		namedWindow(window_name, CV_WINDOW_AUTOSIZE);
+		imshow(window_name, images[i]);
+	}
+}
+
+/**
+ * Displays both the query image and all of the result images in the same window
+ */
+void displayImgsSameWindow(vector<Mat> images)
+{
+	int numRows, numCols;
+	int imgsSqrt = (int)sqrt(images.size());
+	// assume each image in the set has same dimensions
+	int indivImgHeight = images[0].rows;
+	int indivImgWidth = images[0].cols;
+
+	numCols = imgsSqrt;
+	// account for extra row(s) for remaining image(s), and round up
+	numRows = ceil((float)images.size()/(float)numCols);  
+
+	//                        width                 height         color channels & initial vals
+	Mat dstMat(Size(numCols*indivImgWidth, numRows*indivImgHeight), CV_8UC3, Scalar(0, 0, 0));
+
+	int curImgIdx = 0;
+	for (int i = 0; i < numRows; i++)
+	{
+		for (int j = 0; j < numCols; j++)
+		{
+			if (curImgIdx == images.size())
+			{
+				break;
+			}
+			images[curImgIdx].copyTo(dstMat(Rect(j*indivImgWidth, i*indivImgHeight, indivImgWidth, indivImgHeight)));
+			curImgIdx ++;
+		}
+	}
+	// Shrink the collective image down after all smaller images are in it
+	float scaledWidth = 500;
+	float scale, scaledHeight;
+	scale = scaledWidth / dstMat.cols;
+	scaledHeight = dstMat.rows * scale;
+
+	resize(dstMat,dstMat, Size(scaledWidth, scaledHeight));
+
+	string window_name = "match";
+	namedWindow(window_name, CV_WINDOW_AUTOSIZE);
+	imshow(window_name, dstMat);
+}
+
 int main( int argc, char *argv[] ) {
     char dirName[256];
 	char searchImgName[256];
@@ -453,18 +517,8 @@ int main( int argc, char *argv[] ) {
 	cout << "Sorting image db...\n\n";
 	vector<Mat> sortedImages = sortImageDB( searchImg, images, funcToUse);
 
-	float scaledWidth = 500;
-	float scale, scaledHeight;
-	for (int i = 0; i < 10; i++)
-	{
-		scale = scaledWidth / sortedImages[i].cols;
-		scaledHeight = sortedImages[i].rows * scale;
-		resize(sortedImages[i], sortedImages[i], Size(scaledWidth, scaledHeight));
-
-		string window_name = "match " + to_string(i);
-		namedWindow(window_name, CV_WINDOW_AUTOSIZE);
-		imshow(window_name, sortedImages[i]);
-	}
+	//displayImgsInSeparateWindows(sortedImages);
+	displayImgsSameWindow(sortedImages);
 
 	waitKey(0);
 		

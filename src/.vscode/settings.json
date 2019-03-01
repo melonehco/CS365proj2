@@ -5,6 +5,8 @@
         "iterator": "cpp",
         "string": "cpp",
         "utility": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "ios": "cpp",
+        "iostream": "cpp"
     }
 }
