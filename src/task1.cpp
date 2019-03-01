@@ -446,7 +446,7 @@ void displayImgsInSameWindow(vector<Mat> images)
 	// account for extra row(s) for remaining image(s), and round up
 	numRows = ceil((float)images.size()/(float)numCols);  
 
-	//                        width                 height         color channels & initial vals
+	//                     width                 height         color channels & initial vals
 	Mat dstMat(Size(numCols*indivImgWidth, numRows*indivImgHeight), CV_8UC3, Scalar(0, 0, 0));
 
 	int curImgIdx = 0;
@@ -488,7 +488,7 @@ vector<Mat> truncateMatVector(vector<Mat> images, int vectorSize)
 	{
 		vectorSize = images.size()-1;  
 	}
-	
+
 	vector<Mat> shorterVector(images.begin(), images.begin()+ vectorSize);
 	return shorterVector;
 }
