@@ -18,6 +18,7 @@
 #include <vector>
 #include <algorithm>
 #include <numeric>
+#include <ctype.h>
 #include "opencv2/opencv.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 
@@ -386,7 +387,7 @@ void displayImgsSameWindow(vector<Mat> images)
 		}
 	}
 	// Shrink the collective image down after all smaller images are in it
-	float scaledWidth = 500;
+	float scaledWidth = 600;
 	float scale, scaledHeight;
 	scale = scaledWidth / dstMat.cols;
 	scaledHeight = dstMat.rows * scale;
@@ -398,27 +399,50 @@ void displayImgsSameWindow(vector<Mat> images)
 	imshow(window_name, dstMat);
 }
 
+/**
+ * Returns a vector of a different size, as specified by the user.
+ * Used to only show the first N results.
+ */
+vector<Mat> truncateMatVector(vector<Mat> images, int vectorSize)
+{
+	// if they request more images than are in the directory, show 
+	// all of the images in the directory
+	if (images.size() < vectorSize) 
+	{
+		vectorSize = images.size()-1;  
+	}
+	// plus 1 to exclude the query image that appears first
+	vector<Mat> shorterVector(images.begin(), images.begin()+ vectorSize + 1);
+	return shorterVector;
+}
+
 int main( int argc, char *argv[] ) {
     char dirName[256];
 	char searchImgName[256];
 	char funcNameString[256];
+
+	int numImgsToShow = -1; // -1 is the default, meaning all images will be shown
 	Mat searchImg;
 
-	//TODO: add command-line argument for # output images
 	// TODO: Take these defaults out??
 	// by default, look at the current directory
 	strcpy(dirName, ".");
 	strcpy(searchImgName, ".");
 
 	// If user didn't give directory name and query image name
-	if(argc != 4) 
+	if(argc < 4) 
 	{
-		cout << "please provide a directory name and query image name!\n";
+		cout << "Usage: directory name| query image name| distance metric| (# of images to show)\n";
 		exit(-1);
 	}
 	strcpy(dirName, argv[1]);
 	strcpy(searchImgName, argv[2]);
 	strcpy(funcNameString, argv[3]);
+
+	if (argc > 4) // if only showing first N images
+	{
+		numImgsToShow = std::stoi(argv[4]); // TODO: Throw error for non-int user input
+	}
 
 	searchImg = imread(searchImgName);
 
@@ -448,9 +472,20 @@ int main( int argc, char *argv[] ) {
 	// Choose which kind of function to execute
 
     vector<Mat> images = readInImageDir( dirName );
-	vector<Mat> sortedImages = sortImageDB( searchImg, images, funcToUse);
-	//displayImgsInSeparateWindows(sortedImages);
+	vector<Mat> allSortedImages = sortImageDB( searchImg, images, funcToUse);
+	vector<Mat> sortedImages;
 
+	// Choose whether to show all or just first N images
+	if (numImgsToShow != -1)
+	{
+		sortedImages = truncateMatVector(allSortedImages, numImgsToShow);
+	}
+	else
+	{
+		sortedImages = allSortedImages;
+	}
+	
+	//displayImgsInSeparateWindows(sortedImages);
 	displayImgsSameWindow(sortedImages);
 
 	waitKey(0);
